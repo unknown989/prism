@@ -155,15 +155,20 @@ void draw_pixel(window_t *window, position_t position, color_t color);
 color_t get_pixel(window_t *window, position_t position);
 void draw_line(window_t *window, position_t position1, position_t position2, color_t color);
 void draw_rect(window_t *window, rect_t rect, color_t color);
+void fill_rect(window_t *window, rect_t rect, color_t color);
 void draw_circle(window_t *window, circle_t circle, color_t color);
+void fill_circle(window_t *window, circle_t circle, color_t color);
 void draw_ellipse(window_t *window, ellipse_t ellipse, color_t color);
+void fill_ellipse(window_t *window, ellipse_t ellipse, color_t color);
 void draw_polygon(window_t *window, polygon_t polygon, color_t color);
+void fill_polygon(window_t *window, polygon_t polygon, color_t color);
 void draw_shape(window_t *window, shape_t shape);
 
 // text rendering functions
 void draw_text(window_t *window, text_t text, color_t color, position_t position, int font_size);
 // image rendering functions
 void draw_image(window_t *window, image_t image, position_t position);
+image_t load_bmp(const char *path);
 
 // free functions
 void free_image(image_t *image);

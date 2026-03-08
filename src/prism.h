@@ -4,6 +4,7 @@
 #include <string.h>
 #include <math.h>
 #include <stdint.h>
+#include <stdio.h>
 
 #if defined(PRISM_PLATFORM_WINDOWS)
     #define WIN32_LEAN_AND_MEAN
@@ -509,6 +510,27 @@ void draw_rect(window_t *window, rect_t rect, color_t color) {
     draw_line(window, top_right, bottom_right, color);
 }
 
+void fill_rect(window_t *window, rect_t rect, color_t color) {
+    if (!window || !window->pixels) {
+        return;
+    }
+
+    int x0 = rect.position.x;
+    int y0 = rect.position.y;
+    int x1 = rect.position.x + rect.size.width - 1;
+    int y1 = rect.position.y + rect.size.height - 1;
+
+    for (int y = y0; y <= y1; ++y) {
+        for (int x = x0; x <= x1; ++x) {
+            if (!prism_in_bounds(window, x, y)) {
+                continue;
+            }
+            int idx = prism_index(window, x, y);
+            window->pixels[idx] = prism_pack_color(color);
+        }
+    }
+}
+
 void draw_circle(window_t *window, circle_t circle, color_t color) {
     if (!window || !window->pixels) {
         return;
@@ -543,6 +565,34 @@ void draw_circle(window_t *window, circle_t circle, color_t color) {
         } else {
             x -= 1;
             err -= 2 * x + 1;
+        }
+    }
+}
+
+void fill_circle(window_t *window, circle_t circle, color_t color) {
+    if (!window || !window->pixels) {
+        return;
+    }
+
+    int cx = circle.position.x;
+    int cy = circle.position.y;
+    int r = circle.radius;
+    if (r <= 0) {
+        return;
+    }
+
+    int r2 = r * r;
+    for (int y = -r; y <= r; ++y) {
+        int yy = cy + y;
+        for (int x = -r; x <= r; ++x) {
+            int xx = cx + x;
+            if (x * x + y * y <= r2) {
+                if (!prism_in_bounds(window, xx, yy)) {
+                    continue;
+                }
+                int idx = prism_index(window, xx, yy);
+                window->pixels[idx] = prism_pack_color(color);
+            }
         }
     }
 }
@@ -611,6 +661,43 @@ void draw_ellipse(window_t *window, ellipse_t ellipse, color_t color) {
     }
 }
 
+void fill_ellipse(window_t *window, ellipse_t ellipse, color_t color) {
+    if (!window || !window->pixels) {
+        return;
+    }
+
+    int xc = ellipse.position.x;
+    int yc = ellipse.position.y;
+    int rx = ellipse.width;
+    int ry = ellipse.height;
+    if (rx <= 0 || ry <= 0) {
+        return;
+    }
+
+    double rx2 = (double)rx * (double)rx;
+    double ry2 = (double)ry * (double)ry;
+
+    int x0 = xc - rx;
+    int x1 = xc + rx;
+    int y0 = yc - ry;
+    int y1 = yc + ry;
+
+    for (int y = y0; y <= y1; ++y) {
+        for (int x = x0; x <= x1; ++x) {
+            double dx = (double)(x - xc);
+            double dy = (double)(y - yc);
+            double v = (dx * dx) / rx2 + (dy * dy) / ry2;
+            if (v <= 1.0) {
+                if (!prism_in_bounds(window, x, y)) {
+                    continue;
+                }
+                int idx = prism_index(window, x, y);
+                window->pixels[idx] = prism_pack_color(color);
+            }
+        }
+    }
+}
+
 void draw_polygon(window_t *window, polygon_t polygon, color_t color) {
     if (!polygon.points || polygon.count < 2) {
         return;
@@ -625,6 +712,65 @@ void draw_polygon(window_t *window, polygon_t polygon, color_t color) {
     }
 }
 
+void fill_polygon(window_t *window, polygon_t polygon, color_t color) {
+    if (!window || !window->pixels || !polygon.points || polygon.count < 3) {
+        return;
+    }
+
+    int min_y = polygon.points[0].y;
+    int max_y = polygon.points[0].y;
+    for (int i = 1; i < polygon.count; ++i) {
+        if (polygon.points[i].y < min_y) min_y = polygon.points[i].y;
+        if (polygon.points[i].y > max_y) max_y = polygon.points[i].y;
+    }
+
+    int n = polygon.count;
+    double *nodes = (double *)malloc((size_t)n * sizeof(double));
+    if (!nodes) {
+        return;
+    }
+
+    for (int y = min_y; y <= max_y; ++y) {
+        int count = 0;
+        for (int i = 0, j = n - 1; i < n; j = i++) {
+            int yi = polygon.points[i].y;
+            int yj = polygon.points[j].y;
+            int xi = polygon.points[i].x;
+            int xj = polygon.points[j].x;
+
+            int intersect = (yi < y && yj >= y) || (yj < y && yi >= y);
+            if (intersect && (yj - yi) != 0) {
+                double x = xi + (double)(y - yi) * (double)(xj - xi) / (double)(yj - yi);
+                nodes[count++] = x;
+            }
+        }
+
+        for (int i = 0; i < count - 1; ++i) {
+            for (int j = i + 1; j < count; ++j) {
+                if (nodes[j] < nodes[i]) {
+                    double tmp = nodes[i];
+                    nodes[i] = nodes[j];
+                    nodes[j] = tmp;
+                }
+            }
+        }
+
+        for (int i = 0; i < count - 1; i += 2) {
+            int x_start = (int)ceil(nodes[i]);
+            int x_end = (int)floor(nodes[i + 1]);
+            for (int x = x_start; x <= x_end; ++x) {
+                if (!prism_in_bounds(window, x, y)) {
+                    continue;
+                }
+                int idx = prism_index(window, x, y);
+                window->pixels[idx] = prism_pack_color(color);
+            }
+        }
+    }
+
+    free(nodes);
+}
+
 void draw_shape(window_t *window, shape_t shape) {
     if (!shape.points || shape.count < 4) {
         return;
@@ -636,13 +782,316 @@ void draw_shape(window_t *window, shape_t shape) {
     }
 }
 
+static void prism_draw_glyph(window_t *window, char ch, position_t origin, color_t color, int scale) {
+    if (!window || !window->pixels) {
+        return;
+    }
+
+    int x0 = origin.x;
+    int y0 = origin.y;
+
+#define P(X, Y) (position_t){x0 + (X) * scale, y0 + (Y) * scale}
+
+    switch (ch) {
+        case 'A':
+            draw_line(window, P(0, 6), P(2, 0), color);
+            draw_line(window, P(2, 0), P(4, 6), color);
+            draw_line(window, P(1, 3), P(3, 3), color);
+            break;
+        case 'B':
+            draw_line(window, P(0, 0), P(0, 6), color);
+            draw_line(window, P(0, 0), P(3, 1), color);
+            draw_line(window, P(3, 1), P(3, 3), color);
+            draw_line(window, P(3, 3), P(0, 3), color);
+            draw_line(window, P(0, 3), P(3, 4), color);
+            draw_line(window, P(3, 4), P(3, 6), color);
+            draw_line(window, P(3, 6), P(0, 6), color);
+            break;
+        case 'C':
+            draw_line(window, P(3, 0), P(1, 0), color);
+            draw_line(window, P(1, 0), P(0, 1), color);
+            draw_line(window, P(0, 1), P(0, 5), color);
+            draw_line(window, P(0, 5), P(1, 6), color);
+            draw_line(window, P(1, 6), P(3, 6), color);
+            break;
+        case 'D':
+            draw_line(window, P(0, 0), P(0, 6), color);
+            draw_line(window, P(0, 0), P(2, 1), color);
+            draw_line(window, P(2, 1), P(2, 5), color);
+            draw_line(window, P(2, 5), P(0, 6), color);
+            break;
+        case 'E':
+            draw_line(window, P(0, 0), P(0, 6), color);
+            draw_line(window, P(0, 0), P(4, 0), color);
+            draw_line(window, P(0, 3), P(3, 3), color);
+            draw_line(window, P(0, 6), P(4, 6), color);
+            break;
+        case 'F':
+            draw_line(window, P(0, 0), P(0, 6), color);
+            draw_line(window, P(0, 0), P(4, 0), color);
+            draw_line(window, P(0, 3), P(3, 3), color);
+            break;
+        case 'G':
+            draw_line(window, P(3, 0), P(1, 0), color);
+            draw_line(window, P(1, 0), P(0, 1), color);
+            draw_line(window, P(0, 1), P(0, 5), color);
+            draw_line(window, P(0, 5), P(1, 6), color);
+            draw_line(window, P(1, 6), P(3, 6), color);
+            draw_line(window, P(3, 6), P(3, 3), color);
+            draw_line(window, P(3, 3), P(2, 3), color);
+            break;
+        case 'H':
+            draw_line(window, P(0, 0), P(0, 6), color);
+            draw_line(window, P(4, 0), P(4, 6), color);
+            draw_line(window, P(0, 3), P(4, 3), color);
+            break;
+        case 'I':
+            draw_line(window, P(0, 0), P(4, 0), color);
+            draw_line(window, P(2, 0), P(2, 6), color);
+            draw_line(window, P(0, 6), P(4, 6), color);
+            break;
+        case 'J':
+            draw_line(window, P(0, 0), P(4, 0), color);
+            draw_line(window, P(2, 0), P(2, 5), color);
+            draw_line(window, P(2, 5), P(1, 6), color);
+            draw_line(window, P(1, 6), P(0, 5), color);
+            break;
+        case 'K':
+            draw_line(window, P(0, 0), P(0, 6), color);
+            draw_line(window, P(4, 0), P(0, 3), color);
+            draw_line(window, P(0, 3), P(4, 6), color);
+            break;
+        case 'L':
+            draw_line(window, P(0, 0), P(0, 6), color);
+            draw_line(window, P(0, 6), P(4, 6), color);
+            break;
+        case 'M':
+            draw_line(window, P(0, 6), P(0, 0), color);
+            draw_line(window, P(0, 0), P(2, 2), color);
+            draw_line(window, P(2, 2), P(4, 0), color);
+            draw_line(window, P(4, 0), P(4, 6), color);
+            break;
+        case 'N':
+            draw_line(window, P(0, 6), P(0, 0), color);
+            draw_line(window, P(0, 0), P(4, 6), color);
+            draw_line(window, P(4, 6), P(4, 0), color);
+            break;
+        case 'O':
+            draw_line(window, P(1, 0), P(3, 0), color);
+            draw_line(window, P(1, 0), P(0, 1), color);
+            draw_line(window, P(0, 1), P(0, 5), color);
+            draw_line(window, P(0, 5), P(1, 6), color);
+            draw_line(window, P(1, 6), P(3, 6), color);
+            draw_line(window, P(3, 6), P(4, 5), color);
+            draw_line(window, P(4, 5), P(4, 1), color);
+            draw_line(window, P(4, 1), P(3, 0), color);
+            break;
+        case 'P':
+            draw_line(window, P(0, 0), P(0, 6), color);
+            draw_line(window, P(0, 0), P(3, 0), color);
+            draw_line(window, P(3, 0), P(3, 3), color);
+            draw_line(window, P(3, 3), P(0, 3), color);
+            break;
+        case 'Q':
+            draw_line(window, P(1, 0), P(3, 0), color);
+            draw_line(window, P(1, 0), P(0, 1), color);
+            draw_line(window, P(0, 1), P(0, 5), color);
+            draw_line(window, P(0, 5), P(1, 6), color);
+            draw_line(window, P(1, 6), P(3, 6), color);
+            draw_line(window, P(3, 6), P(4, 5), color);
+            draw_line(window, P(4, 5), P(4, 1), color);
+            draw_line(window, P(4, 1), P(3, 0), color);
+            draw_line(window, P(2, 4), P(4, 6), color);
+            break;
+        case 'R':
+            draw_line(window, P(0, 0), P(0, 6), color);
+            draw_line(window, P(0, 0), P(3, 0), color);
+            draw_line(window, P(3, 0), P(3, 3), color);
+            draw_line(window, P(3, 3), P(0, 3), color);
+            draw_line(window, P(0, 3), P(4, 6), color);
+            break;
+        case 'S':
+            draw_line(window, P(3, 0), P(1, 0), color);
+            draw_line(window, P(1, 0), P(0, 1), color);
+            draw_line(window, P(0, 1), P(0, 2), color);
+            draw_line(window, P(0, 2), P(3, 3), color);
+            draw_line(window, P(3, 3), P(3, 5), color);
+            draw_line(window, P(3, 5), P(2, 6), color);
+            draw_line(window, P(2, 6), P(0, 6), color);
+            break;
+        case 'T':
+            draw_line(window, P(0, 0), P(4, 0), color);
+            draw_line(window, P(2, 0), P(2, 6), color);
+            break;
+        case 'U':
+            draw_line(window, P(0, 0), P(0, 5), color);
+            draw_line(window, P(0, 5), P(1, 6), color);
+            draw_line(window, P(1, 6), P(3, 6), color);
+            draw_line(window, P(3, 6), P(4, 5), color);
+            draw_line(window, P(4, 5), P(4, 0), color);
+            break;
+        case 'V':
+            draw_line(window, P(0, 0), P(2, 6), color);
+            draw_line(window, P(2, 6), P(4, 0), color);
+            break;
+        case 'W':
+            draw_line(window, P(0, 0), P(1, 6), color);
+            draw_line(window, P(1, 6), P(2, 4), color);
+            draw_line(window, P(2, 4), P(3, 6), color);
+            draw_line(window, P(3, 6), P(4, 0), color);
+            break;
+        case 'X':
+            draw_line(window, P(0, 0), P(4, 6), color);
+            draw_line(window, P(4, 0), P(0, 6), color);
+            break;
+        case 'Y':
+            draw_line(window, P(0, 0), P(2, 3), color);
+            draw_line(window, P(4, 0), P(2, 3), color);
+            draw_line(window, P(2, 3), P(2, 6), color);
+            break;
+        case 'Z':
+            draw_line(window, P(0, 0), P(4, 0), color);
+            draw_line(window, P(4, 0), P(0, 6), color);
+            draw_line(window, P(0, 6), P(4, 6), color);
+            break;
+        case '0':
+            draw_line(window, P(1, 0), P(3, 0), color);
+            draw_line(window, P(1, 0), P(0, 1), color);
+            draw_line(window, P(0, 1), P(0, 5), color);
+            draw_line(window, P(0, 5), P(1, 6), color);
+            draw_line(window, P(1, 6), P(3, 6), color);
+            draw_line(window, P(3, 6), P(4, 5), color);
+            draw_line(window, P(4, 5), P(4, 1), color);
+            draw_line(window, P(4, 1), P(3, 0), color);
+            break;
+        case '1':
+            draw_line(window, P(1, 1), P(3, 0), color);
+            draw_line(window, P(2, 0), P(2, 6), color);
+            break;
+        case '2':
+            draw_line(window, P(0, 1), P(1, 0), color);
+            draw_line(window, P(1, 0), P(3, 0), color);
+            draw_line(window, P(3, 0), P(4, 1), color);
+            draw_line(window, P(4, 1), P(4, 2), color);
+            draw_line(window, P(4, 2), P(0, 6), color);
+            draw_line(window, P(0, 6), P(4, 6), color);
+            break;
+        case '3':
+            draw_line(window, P(0, 1), P(1, 0), color);
+            draw_line(window, P(1, 0), P(3, 0), color);
+            draw_line(window, P(3, 0), P(4, 1), color);
+            draw_line(window, P(4, 1), P(4, 2), color);
+            draw_line(window, P(4, 2), P(3, 3), color);
+            draw_line(window, P(3, 3), P(4, 4), color);
+            draw_line(window, P(4, 4), P(4, 5), color);
+            draw_line(window, P(4, 5), P(3, 6), color);
+            draw_line(window, P(3, 6), P(1, 6), color);
+            draw_line(window, P(1, 6), P(0, 5), color);
+            break;
+        case '4':
+            draw_line(window, P(3, 0), P(3, 6), color);
+            draw_line(window, P(0, 4), P(4, 4), color);
+            draw_line(window, P(0, 4), P(3, 0), color);
+            break;
+        case '5':
+            draw_line(window, P(4, 0), P(0, 0), color);
+            draw_line(window, P(0, 0), P(0, 3), color);
+            draw_line(window, P(0, 3), P(3, 3), color);
+            draw_line(window, P(3, 3), P(4, 4), color);
+            draw_line(window, P(4, 4), P(4, 5), color);
+            draw_line(window, P(4, 5), P(3, 6), color);
+            draw_line(window, P(3, 6), P(1, 6), color);
+            draw_line(window, P(1, 6), P(0, 5), color);
+            break;
+        case '6':
+            draw_line(window, P(3, 0), P(1, 0), color);
+            draw_line(window, P(1, 0), P(0, 1), color);
+            draw_line(window, P(0, 1), P(0, 5), color);
+            draw_line(window, P(0, 5), P(1, 6), color);
+            draw_line(window, P(1, 6), P(3, 6), color);
+            draw_line(window, P(3, 6), P(4, 5), color);
+            draw_line(window, P(4, 5), P(4, 4), color);
+            draw_line(window, P(4, 4), P(3, 3), color);
+            draw_line(window, P(3, 3), P(0, 3), color);
+            break;
+        case '7':
+            draw_line(window, P(0, 0), P(4, 0), color);
+            draw_line(window, P(4, 0), P(1, 6), color);
+            break;
+        case '8':
+            draw_line(window, P(1, 0), P(3, 0), color);
+            draw_line(window, P(1, 0), P(0, 1), color);
+            draw_line(window, P(0, 1), P(0, 2), color);
+            draw_line(window, P(0, 2), P(1, 3), color);
+            draw_line(window, P(1, 3), P(3, 3), color);
+            draw_line(window, P(3, 3), P(4, 2), color);
+            draw_line(window, P(4, 2), P(4, 1), color);
+            draw_line(window, P(4, 1), P(3, 0), color);
+            draw_line(window, P(0, 4), P(1, 3), color);
+            draw_line(window, P(3, 3), P(4, 4), color);
+            draw_line(window, P(0, 4), P(0, 5), color);
+            draw_line(window, P(0, 5), P(1, 6), color);
+            draw_line(window, P(1, 6), P(3, 6), color);
+            draw_line(window, P(3, 6), P(4, 5), color);
+            draw_line(window, P(4, 5), P(4, 4), color);
+            break;
+        case '9':
+            draw_line(window, P(1, 6), P(3, 6), color);
+            draw_line(window, P(1, 6), P(0, 5), color);
+            draw_line(window, P(0, 5), P(0, 4), color);
+            draw_line(window, P(0, 4), P(1, 3), color);
+            draw_line(window, P(1, 3), P(4, 3), color);
+            draw_line(window, P(4, 3), P(4, 1), color);
+            draw_line(window, P(4, 1), P(3, 0), color);
+            draw_line(window, P(3, 0), P(1, 0), color);
+            draw_line(window, P(1, 0), P(0, 1), color);
+            break;
+        case '-':
+            draw_line(window, P(0, 3), P(4, 3), color);
+            break;
+        case '_':
+            draw_line(window, P(0, 6), P(4, 6), color);
+            break;
+        case '.':
+            draw_line(window, P(2, 5), P(2, 6), color);
+            break;
+        case ',':
+            draw_line(window, P(2, 5), P(1, 6), color);
+            break;
+        case ':':
+            draw_line(window, P(2, 1), P(2, 1), color);
+            draw_line(window, P(2, 4), P(2, 4), color);
+            break;
+        case ' ':
+        default:
+            break;
+    }
+
+#undef P
+}
+
 void draw_text(window_t *window, text_t text, color_t color, position_t position, int font_size) {
-    (void)window;
-    (void)text;
-    (void)color;
-    (void)position;
-    (void)font_size;
-    /* Text rendering requires font handling and is left as a no-op. */
+    if (!window || !window->pixels || !text.text) {
+        return;
+    }
+
+    int scale = font_size > 0 ? font_size : 1;
+    int advance_x = 6 * scale;
+    int line_height = 8 * scale;
+
+    position_t cursor = position;
+    const char *s = text.text;
+    while (*s) {
+        char ch = *s++;
+        if (ch == '\n') {
+            cursor.x = position.x;
+            cursor.y += line_height;
+            continue;
+        }
+
+        prism_draw_glyph(window, ch, cursor, color, scale);
+        cursor.x += advance_x;
+    }
 }
 
 void draw_image(window_t *window, image_t image, position_t position) {
@@ -661,6 +1110,100 @@ void draw_image(window_t *window, image_t image, position_t position) {
             window->pixels[dst_idx] = image.pixels[src_idx];
         }
     }
+}
+
+image_t load_bmp(const char *path) {
+    image_t image;
+    image.pixels = NULL;
+    image.width = 0;
+    image.height = 0;
+
+    if (!path) {
+        return image;
+    }
+
+    FILE *f = fopen(path, "rb");
+    if (!f) {
+        return image;
+    }
+
+    unsigned char header[54];
+    if (fread(header, 1, 54, f) != 54) {
+        fclose(f);
+        return image;
+    }
+
+    if (header[0] != 'B' || header[1] != 'M') {
+        fclose(f);
+        return image;
+    }
+
+    int data_offset = *(int *)&header[10];
+    int width = *(int *)&header[18];
+    int height = *(int *)&header[22];
+    short bpp = *(short *)&header[28];
+    int compression = *(int *)&header[30];
+
+    if (compression != 0 || (bpp != 24 && bpp != 32) || width <= 0 || height == 0) {
+        fclose(f);
+        return image;
+    }
+
+    int row_stride = (width * (bpp / 8) + 3) & ~3;
+
+    if (fseek(f, data_offset, SEEK_SET) != 0) {
+        fclose(f);
+        return image;
+    }
+
+    int abs_height = height > 0 ? height : -height;
+    size_t pixel_count = (size_t)width * (size_t)abs_height;
+    int *pixels = (int *)malloc(pixel_count * sizeof(int));
+    if (!pixels) {
+        fclose(f);
+        return image;
+    }
+
+    unsigned char *row = (unsigned char *)malloc((size_t)row_stride);
+    if (!row) {
+        free(pixels);
+        fclose(f);
+        return image;
+    }
+
+    int top_down = height < 0;
+    for (int y = 0; y < abs_height; ++y) {
+        if (fread(row, 1, (size_t)row_stride, f) != (size_t)row_stride) {
+            free(row);
+            free(pixels);
+            fclose(f);
+            image.pixels = NULL;
+            image.width = 0;
+            image.height = 0;
+            return image;
+        }
+
+        int dst_y = top_down ? y : (abs_height - 1 - y);
+        for (int x = 0; x < width; ++x) {
+            unsigned char *src = row + x * (bpp / 8);
+            unsigned char b = src[0];
+            unsigned char g = src[1];
+            unsigned char r = src[2];
+            unsigned char a = (bpp == 32) ? src[3] : 255;
+
+            color_t c = { (int)r, (int)g, (int)b, (int)a };
+            int idx = dst_y * width + x;
+            pixels[idx] = prism_pack_color(c);
+        }
+    }
+
+    free(row);
+    fclose(f);
+
+    image.pixels = pixels;
+    image.width = width;
+    image.height = abs_height;
+    return image;
 }
 
 void free_image(image_t *image) {

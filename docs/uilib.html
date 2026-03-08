@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Prism UILib – UI library reference</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #ffffff;
+      color: #000000;
+      line-height: 1.5;
+      margin: 0;
+      padding: 24px 16px 40px;
+    }
+
+    .page { max-width: 880px; margin: 0 auto; }
+
+    h1, h2, h3 {
+      font-weight: 600;
+      margin: 0 0 0.6em;
+    }
+
+    h1 {
+      font-size: 1.8rem;
+      border-bottom: 1px solid #000;
+      padding-bottom: 0.4em;
+      margin-bottom: 0.8em;
+    }
+
+    h2 {
+      font-size: 1.25rem;
+      margin-top: 1.6em;
+      border-bottom: 1px solid #ccc;
+      padding-bottom: 0.2em;
+    }
+
+    h3 { font-size: 1.05rem; margin-top: 1.2em; }
+
+    p { margin: 0 0 0.75em; font-size: 0.95rem; }
+
+    ul { margin: 0.3em 0 0.8em 1.3em; padding: 0; font-size: 0.95rem; }
+    li { margin-bottom: 0.3em; }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.9rem;
+      background: #f5f5f5;
+      padding: 0 0.15em;
+      border-radius: 2px;
+    }
+
+    pre {
+      margin: 0.9em 0;
+      padding: 0.75em 0.9em;
+      font-size: 0.9rem;
+      background: #f5f5f5;
+      border: 1px solid #d4d4d4;
+      border-radius: 3px;
+      overflow-x: auto;
+    }
+
+    pre code { background: none; padding: 0; }
+
+    .muted { color: #555555; font-size: 0.9rem; }
+    .small { font-size: 0.88rem; }
+    .section { margin-top: 1.4em; }
+
+    .api-list dt {
+      font-family: ui-monospace, monospace;
+      font-size: 0.9rem;
+      font-weight: 600;
+      margin-top: 0.7em;
+    }
+
+    .api-list dd {
+      margin: 0.2em 0 0.5em 0;
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <h1>Prism UILib</h1>
+
+    <p class="muted">
+      A UI library built on Prism. Immediate-mode style: you call widget functions each frame.
+      Supports layout panels, basic and advanced controls, menus, dialogs, and more.
+    </p>
+
+    <div class="section">
+      <h2>Core types</h2>
+      <ul>
+        <li><strong>uilib_point_t</strong> (alias position_t) – x, y</li>
+        <li><strong>uilib_size_t</strong> (alias prism_size_t) – width, height</li>
+        <li><strong>uilib_rectangle_t</strong> (alias rect_t) – position, size</li>
+        <li><strong>uilib_color_t</strong> (alias color_t) – r, g, b, a</li>
+      </ul>
+      <p>Helpers: <code>uilib_point(x,y)</code>, <code>uilib_size(w,h)</code>, <code>uilib_rect(x,y,w,h)</code>.</p>
+    </div>
+
+    <div class="section">
+      <h2>EventArgs</h2>
+      <ul>
+        <li><strong>uilib_mouse_event_args_t</strong> – x, y, button, pressed</li>
+        <li><strong>uilib_key_event_args_t</strong> – key, pressed</li>
+        <li><strong>uilib_paint_event_args_t</strong> – window, clip_rect</li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <h2>Font, Brush, Pen</h2>
+      <ul>
+        <li><strong>uilib_font_t</strong> – size (scale for Prism built-in font)</li>
+        <li><strong>uilib_brush_t</strong> – color (for fills)</li>
+        <li><strong>uilib_pen_t</strong> – color, width (for outlines)</li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <h2>Application, Window</h2>
+      <dl class="api-list">
+        <dt>uilib_app_create(prism_size_t size, uilib_point_t pos)</dt>
+        <dd>Creates application and main window.</dd>
+        <dt>uilib_app_run / uilib_app_exit</dt>
+        <dd>Lifecycle helpers.</dd>
+      </dl>
+    </div>
+
+    <div class="section">
+      <h2>Timer</h2>
+      <dl class="api-list">
+        <dt>uilib_timer_start(t, interval_ms)</dt>
+        <dd>Start a timer with a tick callback.</dd>
+        <dt>uilib_timer_tick(t, now_ms)</dt>
+        <dd>Call each frame; invokes on_tick when interval elapsed.</dd>
+      </dl>
+    </div>
+
+    <div class="section">
+      <h2>Frame begin</h2>
+      <dl class="api-list">
+        <dt>void uilib_begin(uilib_ctx_t *ctx, window_t *window, const uilib_theme_t *theme);</dt>
+        <dd>Call once per frame before any widgets. Updates mouse, theme.</dd>
+      </dl>
+    </div>
+
+    <div class="section">
+      <h2>Layout panels</h2>
+      <dl class="api-list">
+        <dt>uilib_stack_begin / uilib_stack_next</dt>
+        <dd>StackPanel – vertical or horizontal, returns next child rect.</dd>
+        <dt>uilib_grid_begin / uilib_grid_cell</dt>
+        <dd>Grid – fixed columns and rows.</dd>
+        <dt>uilib_dock_begin / uilib_dock_add</dt>
+        <dd>DockPanel – dock Top, Bottom, Left, Right, Fill.</dd>
+        <dt>uilib_wrap_begin / uilib_wrap_next</dt>
+        <dd>WrapPanel – flow layout with fixed item size.</dd>
+      </dl>
+      <pre><code>uilib_rectangle_t r;
+uilib_stack_begin(&ui, uilib_rect(20, 40, 180, 200), UILIB_ORIENT_VERT, 4);
+if (uilib_stack_next(&ui, 28, &r)) uilib_button(&ui, r, "Click");</code></pre>
+    </div>
+
+    <div class="section">
+      <h2>Containers</h2>
+      <dl class="api-list">
+        <dt>uilib_panel(ctx, rect)</dt>
+        <dd>Filled panel with border.</dd>
+        <dt>uilib_group_box(ctx, rect, title)</dt>
+        <dd>Grouped panel with title.</dd>
+        <dt>uilib_scroll_viewer_begin / uilib_scroll_viewer_end</dt>
+        <dd>ScrollViewer – pass uilib_scroll_state_t with content/view heights.</dd>
+      </dl>
+    </div>
+
+    <div class="section">
+      <h2>Basic widgets</h2>
+      <dl class="api-list">
+        <dt>bool uilib_button(ctx, rect, label)</dt>
+        <dd>Returns true on click.</dd>
+        <dt>void uilib_label(ctx, pos, text, dim)</dt>
+        <dd>Text only. dim=true for muted color.</dd>
+        <dt>bool uilib_checkbox(ctx, rect, label, uilib_checkbox_state_t *state)</dt>
+        <dd>Toggle. state->checked.</dd>
+        <dt>bool uilib_radiobutton(ctx, rect, label, value, uilib_radiobutton_state_t *state)</dt>
+        <dd>Radio. state->selected.</dd>
+      </dl>
+    </div>
+
+    <div class="section">
+      <h2>TextBox</h2>
+      <dl class="api-list">
+        <dt>void uilib_textbox(ctx, rect, uilib_textbox_state_t *state)</dt>
+        <dd>Single-line text. state: buf, len, caret, scroll_x. Ctrl+H = backspace.</dd>
+      </dl>
+    </div>
+
+    <div class="section">
+      <h2>ListBox, ComboBox</h2>
+      <dl class="api-list">
+        <dt>bool uilib_listbox(ctx, rect, uilib_listbox_state_t *state)</dt>
+        <dd>state: items[], count, selected, scroll_offset.</dd>
+        <dt>bool uilib_combobox(ctx, rect, uilib_combobox_state_t *state)</dt>
+        <dd>state: items[], count, selected, dropped.</dd>
+      </dl>
+    </div>
+
+    <div class="section">
+      <h2>ScrollBar, ProgressBar, Slider</h2>
+      <dl class="api-list">
+        <dt>bool uilib_scrollbar(ctx, rect, vertical, uilib_scrollbar_state_t *state)</dt>
+        <dd>state: value, min_val, max_val, page_size.</dd>
+        <dt>void uilib_progressbar(ctx, rect, uilib_progressbar_state_t *state)</dt>
+        <dd>state->value 0..1.</dd>
+        <dt>bool uilib_slider(ctx, rect, vertical, uilib_slider_state_t *state)</dt>
+        <dd>state->value 0..1. Returns true when changed.</dd>
+      </dl>
+    </div>
+
+    <div class="section">
+      <h2>PictureBox, TabControl, Splitter</h2>
+      <dl class="api-list">
+        <dt>void uilib_picture_box(ctx, rect, uilib_image_t *img)</dt>
+        <dd>Displays image or placeholder.</dd>
+        <dt>uilib_tab_control_begin / uilib_tab_control_end</dt>
+        <dd>TabControl. Pass uilib_tab_state_t: tabs[], count, selected.</dd>
+        <dt>void uilib_splitter(ctx, rect, vertical, uilib_splitter_state_t *state)</dt>
+        <dd>Draggable splitter. state: pos, dragging.</dd>
+      </dl>
+    </div>
+
+    <div class="section">
+      <h2>Menus</h2>
+      <dl class="api-list">
+        <dt>bool uilib_menu_strip(ctx, rect, uilib_menu_strip_t *strip, int *out_id)</dt>
+        <dd>MenuStrip – horizontal menu bar.</dd>
+        <dt>bool uilib_context_menu(ctx, uilib_context_menu_t *menu, int *out_id)</dt>
+        <dd>ContextMenuStrip – popup. menu->open, menu->position.</dd>
+        <dt>void uilib_status_strip(ctx, rect, text)</dt>
+        <dd>StatusStrip – status bar.</dd>
+      </dl>
+    </div>
+
+    <div class="section">
+      <h2>Dialogs</h2>
+      <p>Platform-dependent. Windows: native dialogs. Linux/macOS: stubs return false/none.</p>
+      <dl class="api-list">
+        <dt>uilib_message_box(title, message, buttons)</dt>
+        <dd>OK, OK_CANCEL, YES_NO. Returns result.</dd>
+        <dt>uilib_open_file_dialog / uilib_save_file_dialog</dt>
+        <dd>File picker. Fill filename[], filter.</dd>
+        <dt>uilib_folder_browser_dialog</dt>
+        <dd>Folder picker. path[].</dd>
+        <dt>uilib_color_dialog / uilib_font_dialog</dt>
+        <dd>Color or font picker.</dd>
+      </dl>
+    </div>
+
+    <div class="section">
+      <h2>PropertyGrid</h2>
+      <dl class="api-list">
+        <dt>void uilib_property_grid(ctx, rect, uilib_property_grid_t *grid)</dt>
+        <dd>Simple property list. props[].name, type (INT/FLOAT/BOOL/STRING), value.</dd>
+      </dl>
+    </div>
+
+    <div class="section">
+      <h2>Image, Icon, Cursor</h2>
+      <ul>
+        <li><strong>uilib_image_t</strong> – alias image_t. Use load_bmp() from Prism.</li>
+        <li><strong>uilib_icon_t</strong> – wrapper for image.</li>
+        <li><strong>uilib_cursor_type_t</strong> – placeholder (no native cursor without platform code).</li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <h2>Demo</h2>
+      <p>Build and run:</p>
+      <pre><code>make uilib_demo
+./uilib_demo</code></pre>
+      <p>The demo showcases: StackPanel layout, Button, CheckBox, RadioButton, TextBox, Slider, ProgressBar, ListBox, ComboBox, TabControl, StatusStrip.</p>
+    </div>
+
+    <div class="section">
+      <h2>Build</h2>
+      <p>Link with <code>-luser32 -lgdi32</code> on Windows. Add <code>-lcomdlg32 -lshell32</code> for dialogs.</p>
+      <p>On Linux: <code>-lX11 -lm</code>. Dialogs are stubbed.</p>
+    </div>
+  </div>
+</body>
+</html>
